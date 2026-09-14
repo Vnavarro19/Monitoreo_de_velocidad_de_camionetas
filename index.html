@@ -14,21 +14,10 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- Librería para Agrupar Marcadores (Optimización de Rendimiento) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
-    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-
     <style>
-        #map { height: 100%; min-height: 500px; z-index: 10; }
+        #map { height: 100%; min-height: 400px; z-index: 10; }
         .kpi-card { transition: transform 0.2s; }
         .kpi-card:hover { transform: translateY(-2px); }
-        .marker-cluster-small { background-color: rgba(59, 130, 246, 0.6); }
-        .marker-cluster-small div { background-color: rgba(59, 130, 246, 0.9); color: white; }
-        .marker-cluster-medium { background-color: rgba(251, 191, 36, 0.6); }
-        .marker-cluster-medium div { background-color: rgba(245, 158, 11, 0.9); color: white; }
-        .marker-cluster-large { background-color: rgba(239, 68, 68, 0.6); }
-        .marker-cluster-large div { background-color: rgba(220, 38, 38, 0.9); color: white; }
     </style>
 </head>
 <body class="bg-gray-100 p-4 md:p-6 font-sans text-gray-800 relative">
@@ -46,9 +35,8 @@
                     <h2 class="text-md text-gray-500 font-semibold mt-1">Sede Cerrejón - Monitoreo de velocidad de interaccion de equipos moviles</h2>
                 </div>
             </div>
-            <div id="estadoCarga" class="text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded shadow-sm flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Descargando y procesando datos masivos...
+            <div id="estadoCarga" class="text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded shadow-sm">
+                Cargando datos desde Google Sheets...
             </div>
         </div>
 
@@ -92,7 +80,7 @@
             </div>
         </div>
 
-        <!-- KPIs Superiores -->
+        <!-- KPIs Superiores (Ajustado a 6 columnas) -->
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="bg-white border rounded-lg p-4 shadow-sm text-center kpi-card border-l-4 border-l-gray-500">
                 <h3 class="text-xs font-bold text-gray-500 uppercase">Vel. Promedio</h3>
@@ -158,6 +146,7 @@
                 <p class="text-[10px] text-gray-400 mb-2">Frecuencia de eventos por km/h</p>
                 <div class="relative w-full h-80"><canvas id="histogramaChart"></canvas></div>
             </div>
+            
             <div class="w-full xl:w-2/3 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
                 <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Camioneta</h3>
                 <p class="text-[10px] text-gray-400 mb-2">Escala logarítmica para facilitar visualización</p>
@@ -191,13 +180,14 @@
 
         let rawData = [];
         let map = null;
-        let markersCluster = null; 
+        let mapMarkers = [];
         let charts = { mes: null, tendencia: null, camioneta: null, histograma: null };
 
-        const colorMenor70 = '#3b82f6';
-        const color70 = '#10b981';
-        const color76 = '#fbbf24';
-        const color80 = '#ef4444';
+        // Definición de colores
+        const colorMenor70 = '#3b82f6'; // Azul
+        const color70 = '#10b981'; // Verde
+        const color76 = '#fbbf24'; // Amarillo
+        const color80 = '#ef4444'; // Rojo
 
         function parseFecha(fechaStr) {
             if (!fechaStr) return null;
@@ -213,11 +203,7 @@
         function fetchCSV(url) {
             return new Promise((resolve, reject) => {
                 Papa.parse(url, {
-                    download: true, 
-                    header: true, 
-                    skipEmptyLines: true,
-                    worker: true,       
-                    fastMode: true,     
+                    download: true, header: true, skipEmptyLines: true,
                     complete: results => resolve(results.data),
                     error: err => reject(err)
                 });
@@ -228,53 +214,19 @@
             inicializarMapa();
             
             fetchCSV(urlDatos).then(data => {
-                // Buscador Dinámico de Columnas (Soluciona el problema de los espacios o mayúsculas)
-                if (data.length === 0) throw new Error("No hay datos");
-                const keys = Object.keys(data[0]);
-                
-                const keyFecha = keys.find(k => k.toLowerCase().includes('fecha')) || 'Fecha';
-                const keyMovil = keys.find(k => k.toLowerCase().includes('movil') || k.toLowerCase().includes('placa') || k.toLowerCase().includes('equipo')) || 'Movil';
-                const keyContrato = keys.find(k => k.toLowerCase().includes('contrato')) || 'CONTRATO';
-                const keyVel = keys.find(k => k.toLowerCase().includes('vel') || k.toLowerCase().includes('velocidad')) || 'Vel.';
-                const keyLat = keys.find(k => k.toLowerCase().includes('lat')) || 'Latitud';
-                const keyLng = keys.find(k => k.toLowerCase().includes('lon') || k.toLowerCase().includes('lng')) || 'Longitud';
-                const keyLoc = keys.find(k => k.toLowerCase().includes('locali') || k.toLowerCase().includes('zona')) || 'Localizacion';
-
                 rawData = data.map(d => {
-                    const vel = parseFloat(d[keyVel]) || 0;
-                    const fRaw = (d[keyFecha] || '').toString().trim();
-                    const pF = parseFecha(fRaw);
-                    
-                    let weekNum = '', mesKey = '', yearKey = '', diaKey = '', tendenciaWeekKey = '';
-                    
-                    if (pF) {
-                        mesKey = `${pF.año}-${pF.mes}`;
-                        yearKey = pF.año;
-                        diaKey = `${pF.año}-${pF.mes}-${pF.dia}`;
-                        
-                        const dateObj = new Date(pF.año, parseInt(pF.mes)-1, pF.dia);
-                        const firstDayOfYear = new Date(dateObj.getFullYear(), 0, 1);
-                        const pastDaysOfYear = (dateObj - firstDayOfYear) / 86400000;
-                        weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7).toString().padStart(2, '0');
-                        tendenciaWeekKey = `${pF.año}-S${weekNum}`;
-                    }
-
                     return {
-                        fechaRaw: fRaw,
-                        año: yearKey,
-                        mesKey: mesKey,
-                        diaKey: diaKey,
-                        tendenciaWeekKey: tendenciaWeekKey,
-                        movil: (d[keyMovil] || 'Sin Asignar').toString().trim(),
-                        contrato: (d[keyContrato] || 'Sin Contrato').toString().trim(),
-                        velocidad: vel,
-                        lat: parseFloat(d[keyLat]) || 0,
-                        lng: parseFloat(d[keyLng]) || 0,
-                        localizacion: d[keyLoc] || ''
+                        fechaRaw: d['Fecha'] || '',
+                        movil: (d['Movil'] || '').trim(),
+                        contrato: (d['CONTRATO'] || '').trim(),
+                        velocidad: parseFloat(d['Vel.']) || 0,
+                        lat: parseFloat(d['Latitud']) || 0,
+                        lng: parseFloat(d['Longitud']) || 0,
+                        localizacion: d['Localizacion'] || ''
                     };
-                }); 
+                }).filter(d => !isNaN(d.velocidad)); 
 
-                document.getElementById('estadoCarga').innerHTML = "Datos cargados ✓";
+                document.getElementById('estadoCarga').textContent = "Datos cargados de Google Sheets ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded shadow-sm";
                 document.getElementById('filtrosContainer').classList.remove('hidden');
                 document.getElementById('filtrosContainer').classList.add('flex');
@@ -289,7 +241,7 @@
 
                 procesarYDibujarTodo();
             }).catch(err => {
-                document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa que el documento tenga información.";
+                document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa permisos o estructura.";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-red-600 bg-red-50 p-2 rounded shadow-sm";
                 console.error(err);
             });
@@ -298,21 +250,17 @@
         function inicializarMapa() {
             map = L.map('map').setView([11.08, -72.63], 8);
             L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                attribution: '&copy; Google Maps', maxZoom: 20
+                attribution: '&copy; Google Maps',
+                maxZoom: 20
             }).addTo(map);
-
-            markersCluster = L.markerClusterGroup({
-                chunkedLoading: true,
-                disableClusteringAtZoom: 16
-            });
-            map.addLayer(markersCluster);
         }
 
         function inicializarFiltros() {
             const mesesSet = new Set(), movilSet = new Set(), contratoSet = new Set();
             
             rawData.forEach(d => {
-                if (d.mesKey) mesesSet.add(d.mesKey);
+                const pFecha = parseFecha(d.fechaRaw);
+                if (pFecha) mesesSet.add(`${pFecha.año}-${pFecha.mes}`);
                 if (d.movil) movilSet.add(d.movil);
                 if (d.contrato) contratoSet.add(d.contrato);
             });
@@ -332,13 +280,12 @@
         function abrirModalDatos(titulo, datos) {
             document.getElementById('modalTitle').textContent = titulo;
             const columnas = ['Fecha', 'Movil', 'Contrato', 'Vel.', 'Localizacion'];
+            
             const thead = document.getElementById('modalThead');
             thead.innerHTML = `<tr>${columnas.map(col => `<th class="px-4 py-3 font-bold text-left border-b">${col}</th>`).join('')}</tr>`;
             
-            const datosLimitados = datos.slice(0, 1000);
-            
             const tbody = document.getElementById('modalTbody');
-            tbody.innerHTML = datosLimitados.map(fila => `
+            tbody.innerHTML = datos.map(fila => `
                 <tr class="hover:bg-blue-50 transition-colors">
                     <td class="px-4 py-2 border-b border-gray-100">${fila.fechaRaw}</td>
                     <td class="px-4 py-2 border-b border-gray-100 font-bold">${fila.movil}</td>
@@ -348,8 +295,7 @@
                 </tr>
             `).join('');
             
-            const msgLimite = datos.length > 1000 ? `(Mostrando los primeros 1000 de ${datos.length})` : '';
-            document.getElementById('modalCount').textContent = `Total registros: ${datos.length} ${msgLimite}`;
+            document.getElementById('modalCount').textContent = `Total registros mostrados: ${datos.length}`;
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
@@ -370,7 +316,10 @@
             document.getElementById('tendenciaTitle').textContent = `Tendencia de Eventos (${comboTexto})`;
 
             const datosFiltrados = rawData.filter(d => {
-                if (!mesSel.esTodos && !mesSel.valores.includes(d.mesKey)) return false;
+                const pFecha = parseFecha(d.fechaRaw);
+                const mesKey = pFecha ? `${pFecha.año}-${pFecha.mes}` : null;
+                
+                if (!mesSel.esTodos && !mesSel.valores.includes(mesKey)) return false;
                 if (!movilSel.esTodos && !movilSel.valores.includes(d.movil)) return false;
                 if (!contratoSel.esTodos && !contratoSel.valores.includes(d.contrato)) return false;
                 
@@ -381,6 +330,7 @@
                 else if (d.velocidad > 80) bucketStr = '>80';
 
                 if (!rangoSel.esTodos && !rangoSel.valores.includes(bucketStr)) return false;
+
                 return true;
             });
 
@@ -388,8 +338,8 @@
             let cMenor70 = 0, c70 = 0, c76 = 0, c80 = 0;
             const agruparMes = {}, agruparTendencia = {}, agruparMovil = {}, agruparVelocidad = {};
             
-            markersCluster.clearLayers();
-            let newMarkers = [];
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
 
             datosFiltrados.forEach(d => {
                 const v = d.velocidad;
@@ -410,19 +360,26 @@
                 if (!agruparVelocidad[velRedondeada]) agruparVelocidad[velRedondeada] = 0;
                 agruparVelocidad[velRedondeada]++;
 
-                if (d.mesKey) {
-                    if (!agruparMes[d.mesKey]) agruparMes[d.mesKey] = { bMenor70:0, b70:0, b76:0, b80:0 };
-                    agruparMes[d.mesKey][bucket]++;
+                const pF = parseFecha(d.fechaRaw);
+                if (pF) {
+                    const mesKey = `${pF.año}-${pF.mes}`;
+                    if (!agruparMes[mesKey]) agruparMes[mesKey] = { bMenor70:0, b70:0, b76:0, b80:0 };
+                    agruparMes[mesKey][bucket]++;
 
                     let tendenciaKey = '';
-                    if (dimTiempo === 'year') tendenciaKey = d.año;
-                    else if (dimTiempo === 'year-month') tendenciaKey = d.mesKey;
-                    else if (dimTiempo === 'year-week') tendenciaKey = d.tendenciaWeekKey;
-                    
-                    if (tendenciaKey) {
-                        if (!agruparTendencia[tendenciaKey]) agruparTendencia[tendenciaKey] = 0;
-                        agruparTendencia[tendenciaKey]++;
+                    if (dimTiempo === 'year') {
+                        tendenciaKey = pF.año;
+                    } else if (dimTiempo === 'year-month') {
+                        tendenciaKey = `${pF.año}-${pF.mes}`;
+                    } else if (dimTiempo === 'year-week') {
+                        const dateObj = new Date(pF.año, parseInt(pF.mes)-1, pF.dia);
+                        const firstDayOfYear = new Date(dateObj.getFullYear(), 0, 1);
+                        const pastDaysOfYear = (dateObj - firstDayOfYear) / 86400000;
+                        const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+                        tendenciaKey = `${pF.año}-S${weekNum.toString().padStart(2, '0')}`;
                     }
+                    if (!agruparTendencia[tendenciaKey]) agruparTendencia[tendenciaKey] = 0;
+                    agruparTendencia[tendenciaKey]++;
                 }
 
                 if (!agruparMovil[d.movil]) agruparMovil[d.movil] = { bMenor70:0, b70:0, b76:0, b80:0, total:0 };
@@ -433,12 +390,12 @@
                     const circle = L.circleMarker([d.lat, d.lng], {
                         radius: 5, fillColor: colorMarcador, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8
                     }).bindPopup(`<b>${d.movil}</b><br>Velocidad: ${v} km/h<br>Fecha: ${d.fechaRaw}`);
+                    
                     circle.on('click', () => abrirModalDatos(`Detalle Evento: ${d.movil}`, [d]));
-                    newMarkers.push(circle);
+                    circle.addTo(map);
+                    mapMarkers.push(circle);
                 }
             });
-
-            markersCluster.addLayers(newMarkers);
 
             document.getElementById('kpiPromedio').textContent = countVel > 0 ? Math.round(sumVel / countVel) : 0;
             document.getElementById('kpiMaxima').textContent = Math.round(maxVel);
@@ -519,7 +476,7 @@
                 options: {
                     responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: { x: { ticks: { maxTicksLimit: 12 } } }
+                    scales: { x: { ticks: { maxTicksLimit: 10 } } }
                 }
             });
 
