@@ -191,7 +191,7 @@
 
         let rawData = [];
         let map = null;
-        let markersCluster = null; // Instancia para agrupar miles de marcadores eficientemente
+        let markersCluster = null; 
         let charts = { mes: null, tendencia: null, camioneta: null, histograma: null };
 
         const colorMenor70 = '#3b82f6';
@@ -210,15 +210,14 @@
             return null;
         }
 
-        // 1. OPTIMIZACIÓN DE PAPA PARSE (Workers y FastMode)
         function fetchCSV(url) {
             return new Promise((resolve, reject) => {
                 Papa.parse(url, {
                     download: true, 
                     header: true, 
                     skipEmptyLines: true,
-                    worker: true,       // Procesamiento en segundo plano (No bloquea la página)
-                    fastMode: true,     // Analizador ultra rápido
+                    worker: true,       
+                    fastMode: true,     
                     complete: results => resolve(results.data),
                     error: err => reject(err)
                 });
@@ -229,11 +228,21 @@
             inicializarMapa();
             
             fetchCSV(urlDatos).then(data => {
+                // Buscador Dinámico de Columnas (Soluciona el problema de los espacios o mayúsculas)
+                if (data.length === 0) throw new Error("No hay datos");
+                const keys = Object.keys(data[0]);
                 
-                // 2. PRECÁLCULO DE FECHAS (Se calcula una vez, no en cada clic)
+                const keyFecha = keys.find(k => k.toLowerCase().includes('fecha')) || 'Fecha';
+                const keyMovil = keys.find(k => k.toLowerCase().includes('movil') || k.toLowerCase().includes('placa') || k.toLowerCase().includes('equipo')) || 'Movil';
+                const keyContrato = keys.find(k => k.toLowerCase().includes('contrato')) || 'CONTRATO';
+                const keyVel = keys.find(k => k.toLowerCase().includes('vel') || k.toLowerCase().includes('velocidad')) || 'Vel.';
+                const keyLat = keys.find(k => k.toLowerCase().includes('lat')) || 'Latitud';
+                const keyLng = keys.find(k => k.toLowerCase().includes('lon') || k.toLowerCase().includes('lng')) || 'Longitud';
+                const keyLoc = keys.find(k => k.toLowerCase().includes('locali') || k.toLowerCase().includes('zona')) || 'Localizacion';
+
                 rawData = data.map(d => {
-                    const vel = parseFloat(d['Vel.']) || 0;
-                    const fRaw = d['Fecha'] || '';
+                    const vel = parseFloat(d[keyVel]) || 0;
+                    const fRaw = (d[keyFecha] || '').toString().trim();
                     const pF = parseFecha(fRaw);
                     
                     let weekNum = '', mesKey = '', yearKey = '', diaKey = '', tendenciaWeekKey = '';
@@ -256,14 +265,14 @@
                         mesKey: mesKey,
                         diaKey: diaKey,
                         tendenciaWeekKey: tendenciaWeekKey,
-                        movil: (d['Movil'] || '').trim(),
-                        contrato: (d['CONTRATO'] || '').trim(),
+                        movil: (d[keyMovil] || 'Sin Asignar').toString().trim(),
+                        contrato: (d[keyContrato] || 'Sin Contrato').toString().trim(),
                         velocidad: vel,
-                        lat: parseFloat(d['Latitud']) || 0,
-                        lng: parseFloat(d['Longitud']) || 0,
-                        localizacion: d['Localizacion'] || ''
+                        lat: parseFloat(d[keyLat]) || 0,
+                        lng: parseFloat(d[keyLng]) || 0,
+                        localizacion: d[keyLoc] || ''
                     };
-                }).filter(d => !isNaN(d.velocidad)); 
+                }); 
 
                 document.getElementById('estadoCarga').innerHTML = "Datos cargados ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded shadow-sm";
@@ -280,7 +289,7 @@
 
                 procesarYDibujarTodo();
             }).catch(err => {
-                document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa permisos o estructura.";
+                document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa que el documento tenga información.";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-red-600 bg-red-50 p-2 rounded shadow-sm";
                 console.error(err);
             });
@@ -292,7 +301,6 @@
                 attribution: '&copy; Google Maps', maxZoom: 20
             }).addTo(map);
 
-            // 3. OPTIMIZACIÓN DE MAPA: Inicializa el clúster con carga fragmentada
             markersCluster = L.markerClusterGroup({
                 chunkedLoading: true,
                 disableClusteringAtZoom: 16
@@ -327,7 +335,6 @@
             const thead = document.getElementById('modalThead');
             thead.innerHTML = `<tr>${columnas.map(col => `<th class="px-4 py-3 font-bold text-left border-b">${col}</th>`).join('')}</tr>`;
             
-            // Limitar a los primeros 1000 registros si es necesario para evitar cuelgues del modal interactivo
             const datosLimitados = datos.slice(0, 1000);
             
             const tbody = document.getElementById('modalTbody');
@@ -380,9 +387,7 @@
             let minVel = Infinity, maxVel = 0, sumVel = 0, countVel = 0;
             let cMenor70 = 0, c70 = 0, c76 = 0, c80 = 0;
             const agruparMes = {}, agruparTendencia = {}, agruparMovil = {}, agruparVelocidad = {};
-            const agruparDia = {};
             
-            // Limpia el Cluster de marcadores masivo
             markersCluster.clearLayers();
             let newMarkers = [];
 
@@ -433,7 +438,6 @@
                 }
             });
 
-            // Agrega todos los puntos calculados en un solo bloque al Cluster Map
             markersCluster.addLayers(newMarkers);
 
             document.getElementById('kpiPromedio').textContent = countVel > 0 ? Math.round(sumVel / countVel) : 0;
