@@ -15,7 +15,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
-        /* Estilos personalizados para el mapa y modal */
         #map { height: 100%; min-height: 400px; z-index: 10; }
         .kpi-card { transition: transform 0.2s; }
         .kpi-card:hover { transform: translateY(-2px); }
@@ -29,7 +28,6 @@
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
             <div class="flex items-center gap-4">
                 <div class="bg-gray-900 p-2 rounded shadow-sm flex items-center justify-center">
-                    <!-- Placeholder Logo -->
                     <div class="text-white font-bold px-4 py-2">CERREJÓN</div>
                 </div>
                 <div>
@@ -93,10 +91,8 @@
             </div>
         </div>
 
-        <!-- Contenedor Principal (Mapa y Gráficos) -->
+        <!-- Contenedor Principal -->
         <div class="flex flex-col xl:flex-row gap-6">
-            
-            <!-- Columna Izquierda: Mapa -->
             <div class="w-full xl:w-1/2 border rounded-lg p-2 bg-white shadow-sm flex flex-col">
                 <div class="px-2 pt-2 pb-1 flex justify-between items-center">
                     <h3 class="text-md font-bold text-gray-700">Ubicación de Eventos de Exceso</h3>
@@ -111,33 +107,26 @@
                 </div>
             </div>
 
-            <!-- Columna Derecha: Gráficos de Tiempo -->
             <div class="w-full xl:w-1/2 flex flex-col gap-6">
-                
-                <!-- Gráfico: Meses -->
                 <div class="border rounded-lg p-4 bg-white shadow-sm flex-1">
                     <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Mes</h3>
                     <div class="relative w-full h-64"><canvas id="mesChart"></canvas></div>
                 </div>
-
-                <!-- Gráfico: Tendencia -->
                 <div class="border rounded-lg p-4 bg-white shadow-sm flex-1">
                     <h3 class="text-md font-bold text-gray-700 mb-1">Tendencia Mensual (Eventos Diarios)</h3>
                     <div class="relative w-full h-64"><canvas id="tendenciaChart"></canvas></div>
                 </div>
-
             </div>
         </div>
 
-        <!-- Gráfico Inferior: Por Camioneta -->
+        <!-- Gráfico Inferior -->
         <div class="mt-6 border rounded-lg p-4 bg-white shadow-sm w-full">
             <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Camioneta (Escala Logarítmica)</h3>
             <div class="relative w-full h-80"><canvas id="camionetaChart"></canvas></div>
         </div>
-
     </div>
 
-    <!-- MODAL INTERACTIVO -->
+    <!-- MODAL -->
     <div id="dataModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 p-4">
         <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
             <div class="p-4 border-b flex justify-between items-center bg-gray-900 text-white">
@@ -157,9 +146,7 @@
     </div>
 
     <script>
-        // Configuración de Google Sheets
         const sheetId = '1_5tFMzqyZaaa7UGavxp0qJE5JZvY0oXyttAn_MI9Ywg';
-        // Asumiendo que los datos están en la primera hoja. Cambiar "Hoja1" por el nombre real si falla.
         const urlDatos = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
 
         let rawData = [];
@@ -167,18 +154,15 @@
         let mapMarkers = [];
         let charts = { mes: null, tendencia: null, camioneta: null };
 
-        // Definición de colores según rangos de Looker Studio
-        const color70 = '#10b981'; // Verde (70-75)
-        const color76 = '#fbbf24'; // Amarillo (76-80)
-        const color80 = '#ef4444'; // Rojo (>80)
+        const color70 = '#10b981';
+        const color76 = '#fbbf24';
+        const color80 = '#ef4444';
 
-        // Parseador de Fechas genérico
         function parseFecha(fechaStr) {
             if (!fechaStr) return null;
             let f = fechaStr.toString().trim();
             const partes = f.split(/[-/ T]/);
             if (partes.length >= 3) {
-                // Determinar formato (DD/MM/YYYY vs YYYY/MM/DD)
                 if (partes[0].length === 4) return { año: partes[0], mes: partes[1].padStart(2, '0'), dia: partes[2].substring(0,2).padStart(2, '0') };
                 else return { año: partes[2].substring(0,4), mes: partes[1].padStart(2, '0'), dia: partes[0].padStart(2, '0') };
             }
@@ -200,16 +184,17 @@
             
             fetchCSV(urlDatos).then(data => {
                 rawData = data.map(d => {
-                    // Normalizar nombres de columnas (ajustar según el CSV real)
+                    // Mapeo exacto según la muestra de datos proporcionada
                     return {
-                        fechaRaw: d['Fecha'] || d['Date'] || d['fecha'] || '',
-                        movil: (d['Movil'] || d['Camioneta'] || d['Equipo'] || 'Desconocido').trim(),
-                        contrato: (d['Contrato'] || 'Sin Contrato').trim(),
-                        velocidad: parseFloat(d['Velocidad'] || d['Velocidad (km/h)'] || d['Speed']) || 0,
-                        lat: parseFloat(d['Latitud'] || d['Lat'] || 0),
-                        lng: parseFloat(d['Longitud'] || d['Lng'] || d['Lon'] || 0)
+                        fechaRaw: d['Fecha'] || '',
+                        movil: (d['Movil'] || '').trim(),
+                        contrato: (d['CONTRATO'] || '').trim(),
+                        velocidad: parseFloat(d['Vel.']) || 0, // Ajuste clave aquí
+                        lat: parseFloat(d['Latitud']) || 0,
+                        lng: parseFloat(d['Longitud']) || 0,
+                        localizacion: d['Localizacion'] || ''
                     };
-                }).filter(d => d.velocidad >= 70); // Filtrar solo excesos según el dashboard original
+                }).filter(d => d.velocidad >= 70); 
 
                 document.getElementById('estadoCarga').textContent = "Datos cargados de Google Sheets ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded shadow-sm";
@@ -226,10 +211,10 @@
         };
 
         function inicializarMapa() {
-            // Inicializar mapa centrado en La Guajira (Cerrejón aprox)
             map = L.map('map').setView([11.08, -72.63], 8);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            // Reemplazo de CARTO por OpenStreetMap estándar sin API Key
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
         }
 
@@ -239,8 +224,8 @@
             rawData.forEach(d => {
                 const pFecha = parseFecha(d.fechaRaw);
                 if (pFecha) mesesSet.add(`${pFecha.año}-${pFecha.mes}`);
-                movilSet.add(d.movil);
-                contratoSet.add(d.contrato);
+                if (d.movil) movilSet.add(d.movil);
+                if (d.contrato) contratoSet.add(d.contrato);
             });
 
             const poblarSelect = (id, set) => {
@@ -257,7 +242,7 @@
 
         function abrirModalDatos(titulo, datos) {
             document.getElementById('modalTitle').textContent = titulo;
-            const columnas = ['Fecha', 'Movil', 'Contrato', 'Velocidad', 'Latitud', 'Longitud'];
+            const columnas = ['Fecha', 'Movil', 'Contrato', 'Vel.', 'Localizacion'];
             
             const thead = document.getElementById('modalThead');
             thead.innerHTML = `<tr>${columnas.map(col => `<th class="px-4 py-3 font-bold text-left border-b">${col}</th>`).join('')}</tr>`;
@@ -269,8 +254,7 @@
                     <td class="px-4 py-2 border-b border-gray-100 font-bold">${fila.movil}</td>
                     <td class="px-4 py-2 border-b border-gray-100">${fila.contrato}</td>
                     <td class="px-4 py-2 border-b border-gray-100 ${fila.velocidad > 80 ? 'text-red-600 font-bold' : ''}">${fila.velocidad}</td>
-                    <td class="px-4 py-2 border-b border-gray-100">${fila.lat}</td>
-                    <td class="px-4 py-2 border-b border-gray-100">${fila.lng}</td>
+                    <td class="px-4 py-2 border-b border-gray-100 max-w-xs truncate" title="${fila.localizacion}">${fila.localizacion}</td>
                 </tr>
             `).join('');
             
@@ -283,7 +267,6 @@
             const movilSel = document.getElementById('movilFilter').value;
             const contratoSel = document.getElementById('contratoFilter').value;
 
-            // Filtrar Base de Datos
             const datosFiltrados = rawData.filter(d => {
                 const pFecha = parseFecha(d.fechaRaw);
                 const mesKey = pFecha ? `${pFecha.año}-${pFecha.mes}` : null;
@@ -294,13 +277,10 @@
                 return true;
             });
 
-            // Variables de Agrupación
             let maxVel = 0, sumVel = 0, countVel = 0;
             let c70 = 0, c76 = 0, c80 = 0;
-            
             const agruparMes = {}, agruparDia = {}, agruparMovil = {};
             
-            // Limpiar marcadores del mapa
             mapMarkers.forEach(m => map.removeLayer(m));
             mapMarkers = [];
 
@@ -317,7 +297,6 @@
                 else if (v >= 76 && v <= 80) { c76++; bucket = 'b76'; colorMarcador = color76; }
                 else if (v > 80) { c80++; bucket = 'b80'; colorMarcador = color80; }
 
-                // Agrupaciones Temporales
                 const pF = parseFecha(d.fechaRaw);
                 if (pF) {
                     const mesKey = `${pF.año}-${pF.mes}`;
@@ -330,12 +309,10 @@
                     agruparDia[diaKey]++;
                 }
 
-                // Agrupación Camionetas
                 if (!agruparMovil[d.movil]) agruparMovil[d.movil] = { b70:0, b76:0, b80:0, total:0 };
                 agruparMovil[d.movil][bucket]++;
                 agruparMovil[d.movil].total++;
 
-                // Dibujar en Mapa
                 if (d.lat !== 0 && d.lng !== 0) {
                     const circle = L.circleMarker([d.lat, d.lng], {
                         radius: 5, fillColor: colorMarcador, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8
@@ -347,14 +324,12 @@
                 }
             });
 
-            // Actualizar KPIs
             document.getElementById('kpiPromedio').textContent = countVel > 0 ? Math.round(sumVel / countVel) : 0;
             document.getElementById('kpiMaxima').textContent = Math.round(maxVel);
             document.getElementById('kpi70').textContent = c70.toLocaleString('es-CO');
             document.getElementById('kpi76').textContent = c76.toLocaleString('es-CO');
             document.getElementById('kpi80').textContent = c80.toLocaleString('es-CO');
 
-            // Preparar Datos para Gráficos
             const labelsMes = Object.keys(agruparMes).sort();
             const dMes70 = labelsMes.map(l => agruparMes[l].b70);
             const dMes76 = labelsMes.map(l => agruparMes[l].b76);
@@ -363,8 +338,7 @@
             const labelsDia = Object.keys(agruparDia).sort();
             const dDia = labelsDia.map(l => agruparDia[l]);
 
-            // Ordenar Móviles de mayor a menor total
-            const movilesOrdenados = Object.keys(agruparMovil).sort((a,b) => agruparMovil[b].total - agruparMovil[a].total).slice(0, 50); // Top 50 para legibilidad
+            const movilesOrdenados = Object.keys(agruparMovil).sort((a,b) => agruparMovil[b].total - agruparMovil[a].total).slice(0, 50);
             const dMovil70 = movilesOrdenados.map(m => agruparMovil[m].b70);
             const dMovil76 = movilesOrdenados.map(m => agruparMovil[m].b76);
             const dMovil80 = movilesOrdenados.map(m => agruparMovil[m].b80);
@@ -380,7 +354,6 @@
             
             const configLeyenda = { display: true, position: 'top', labels: { boxWidth: 12 } };
 
-            // Gráfico 1: Meses (Barras Apiladas)
             if (charts.mes) charts.mes.destroy();
             charts.mes = new Chart(document.getElementById('mesChart'), {
                 type: 'bar',
@@ -399,7 +372,6 @@
                 }
             });
 
-            // Gráfico 2: Tendencia Mensual Diaria (Líneas)
             if (charts.tendencia) charts.tendencia.destroy();
             charts.tendencia = new Chart(document.getElementById('tendenciaChart'), {
                 type: 'line',
@@ -414,7 +386,6 @@
                 }
             });
 
-            // Gráfico 3: Camionetas (Barras Apiladas - Escala Logarítmica como en Looker)
             if (charts.camioneta) charts.camioneta.destroy();
             charts.camioneta = new Chart(document.getElementById('camionetaChart'), {
                 type: 'bar',
