@@ -40,29 +40,26 @@
             </div>
         </div>
 
-        <!-- Barra de Filtros -->
-        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-center">
-            <div class="flex flex-col w-40">
-                <label for="mesFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Mes</label>
-                <select id="mesFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option value="Todos">Todos</option>
+        <!-- Barra de Filtros (Actualizada para selección múltiple) -->
+        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
+            <div class="flex flex-col w-48">
+                <label for="mesFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Mes (Ctrl+Click)</label>
+                <select id="mesFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
+                    <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-40">
-                <label for="movilFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Móvil (Camioneta)</label>
-                <select id="movilFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option value="Todos">Todos</option>
+            <div class="flex flex-col w-48">
+                <label for="movilFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Móvil (Ctrl+Click)</label>
+                <select id="movilFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
+                    <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-40">
-                <label for="contratoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Contrato</label>
-                <select id="contratoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
-                    <option value="Todos">Todos</option>
+            <div class="flex flex-col w-64">
+                <label for="contratoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Contrato (Ctrl+Click)</label>
+                <select id="contratoFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
+                    <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <button onclick="procesarYDibujarTodo()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded transition-colors text-sm">
-                Aplicar Filtros
-            </button>
         </div>
 
         <!-- KPIs Superiores -->
@@ -184,12 +181,11 @@
             
             fetchCSV(urlDatos).then(data => {
                 rawData = data.map(d => {
-                    // Mapeo exacto según la muestra de datos proporcionada
                     return {
                         fechaRaw: d['Fecha'] || '',
                         movil: (d['Movil'] || '').trim(),
                         contrato: (d['CONTRATO'] || '').trim(),
-                        velocidad: parseFloat(d['Vel.']) || 0, // Ajuste clave aquí
+                        velocidad: parseFloat(d['Vel.']) || 0,
                         lat: parseFloat(d['Latitud']) || 0,
                         lng: parseFloat(d['Longitud']) || 0,
                         localizacion: d['Localizacion'] || ''
@@ -202,6 +198,12 @@
                 document.getElementById('filtrosContainer').classList.add('flex');
                 
                 inicializarFiltros();
+                
+                // Configurar eventos para actualización automática
+                document.getElementById('mesFilter').addEventListener('change', procesarYDibujarTodo);
+                document.getElementById('movilFilter').addEventListener('change', procesarYDibujarTodo);
+                document.getElementById('contratoFilter').addEventListener('change', procesarYDibujarTodo);
+
                 procesarYDibujarTodo();
             }).catch(err => {
                 document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa permisos o estructura.";
@@ -212,7 +214,6 @@
 
         function inicializarMapa() {
             map = L.map('map').setView([11.08, -72.63], 8);
-            // Reemplazo de CARTO por OpenStreetMap estándar sin API Key
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(map);
@@ -262,18 +263,25 @@
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
+        // Función auxiliar para obtener selecciones múltiples
+        function getSeleccionados(id) {
+            const select = document.getElementById(id);
+            const options = Array.from(select.selectedOptions).map(o => o.value);
+            return { valores: options, esTodos: options.length === 0 || options.includes('Todos') };
+        }
+
         function procesarYDibujarTodo() {
-            const mesSel = document.getElementById('mesFilter').value;
-            const movilSel = document.getElementById('movilFilter').value;
-            const contratoSel = document.getElementById('contratoFilter').value;
+            const mesSel = getSeleccionados('mesFilter');
+            const movilSel = getSeleccionados('movilFilter');
+            const contratoSel = getSeleccionados('contratoFilter');
 
             const datosFiltrados = rawData.filter(d => {
                 const pFecha = parseFecha(d.fechaRaw);
                 const mesKey = pFecha ? `${pFecha.año}-${pFecha.mes}` : null;
                 
-                if (mesSel !== 'Todos' && mesKey !== mesSel) return false;
-                if (movilSel !== 'Todos' && d.movil !== movilSel) return false;
-                if (contratoSel !== 'Todos' && d.contrato !== contratoSel) return false;
+                if (!mesSel.esTodos && !mesSel.valores.includes(mesKey)) return false;
+                if (!movilSel.esTodos && !movilSel.valores.includes(d.movil)) return false;
+                if (!contratoSel.esTodos && !contratoSel.valores.includes(d.contrato)) return false;
                 return true;
             });
 
