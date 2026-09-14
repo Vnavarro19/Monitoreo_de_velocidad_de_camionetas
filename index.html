@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero de Control - Monitoreo de Velocidad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Librerías de Gráficos y Datos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <!-- Librería para el Mapa (Leaflet) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        /* Estilos personalizados para el mapa y modal */
+        #map { height: 100%; min-height: 400px; z-index: 10; }
+        .kpi-card { transition: transform 0.2s; }
+        .kpi-card:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 md:p-6 font-sans text-gray-800 relative">
+
+    <div class="max-w-[1800px] mx-auto bg-white p-6 md:p-8 rounded-lg shadow-xl border-t-4 border-emerald-700">
+        
+        <!-- Encabezado -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
+            <div class="flex items-center gap-4">
+                <div class="bg-gray-900 p-2 rounded shadow-sm flex items-center justify-center">
+                    <!-- Placeholder Logo -->
+                    <div class="text-white font-bold px-4 py-2">CERREJÓN</div>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800 uppercase tracking-wide">Monitoreo de Velocidad de Camionetas</h1>
+                    <h2 class="text-md text-gray-500 font-semibold mt-1">Sede Cerrejón - Tablero Interactivo</h2>
+                </div>
+            </div>
+            <div id="estadoCarga" class="text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded shadow-sm">
+                Cargando datos desde Google Sheets...
+            </div>
+        </div>
+
+        <!-- Barra de Filtros -->
+        <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-center">
+            <div class="flex flex-col w-40">
+                <label for="mesFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Mes</label>
+                <select id="mesFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
+            <div class="flex flex-col w-40">
+                <label for="movilFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Móvil (Camioneta)</label>
+                <select id="movilFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
+            <div class="flex flex-col w-40">
+                <label for="contratoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Contrato</label>
+                <select id="contratoFilter" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
+            <button onclick="procesarYDibujarTodo()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded transition-colors text-sm">
+                Aplicar Filtros
+            </button>
+        </div>
+
+        <!-- KPIs Superiores -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white border rounded-lg p-4 shadow-sm text-center kpi-card border-l-4 border-l-blue-500">
+                <h3 class="text-xs font-bold text-gray-500 uppercase">Vel. Promedio</h3>
+                <p id="kpiPromedio" class="text-3xl font-black text-gray-800 mt-2">0</p>
+                <p class="text-[10px] text-gray-400">km/h</p>
+            </div>
+            <div class="bg-white border rounded-lg p-4 shadow-sm text-center kpi-card border-l-4 border-l-purple-500">
+                <h3 class="text-xs font-bold text-gray-500 uppercase">Vel. Máxima</h3>
+                <p id="kpiMaxima" class="text-3xl font-black text-gray-800 mt-2">0</p>
+                <p class="text-[10px] text-gray-400">km/h</p>
+            </div>
+            <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-4 shadow-sm text-center kpi-card">
+                <h3 class="text-xs font-bold text-emerald-700 uppercase">Eventos 70-75 km/h</h3>
+                <p id="kpi70" class="text-3xl font-black text-emerald-600 mt-2">0</p>
+            </div>
+            <div class="bg-yellow-50 border border-yellow-100 rounded-lg p-4 shadow-sm text-center kpi-card">
+                <h3 class="text-xs font-bold text-yellow-700 uppercase">Eventos 76-80 km/h</h3>
+                <p id="kpi76" class="text-3xl font-black text-yellow-600 mt-2">0</p>
+            </div>
+            <div class="bg-red-50 border border-red-100 rounded-lg p-4 shadow-sm text-center kpi-card">
+                <h3 class="text-xs font-bold text-red-700 uppercase">Eventos > 80 km/h</h3>
+                <p id="kpi80" class="text-3xl font-black text-red-600 mt-2">0</p>
+            </div>
+        </div>
+
+        <!-- Contenedor Principal (Mapa y Gráficos) -->
+        <div class="flex flex-col xl:flex-row gap-6">
+            
+            <!-- Columna Izquierda: Mapa -->
+            <div class="w-full xl:w-1/2 border rounded-lg p-2 bg-white shadow-sm flex flex-col">
+                <div class="px-2 pt-2 pb-1 flex justify-between items-center">
+                    <h3 class="text-md font-bold text-gray-700">Ubicación de Eventos de Exceso</h3>
+                    <div class="flex gap-2 text-[10px] font-bold">
+                        <span class="px-2 py-1 bg-emerald-500 text-white rounded">70-75</span>
+                        <span class="px-2 py-1 bg-yellow-400 text-black rounded">76-80</span>
+                        <span class="px-2 py-1 bg-red-500 text-white rounded">>80</span>
+                    </div>
+                </div>
+                <div class="relative w-full flex-grow rounded overflow-hidden" style="min-height: 500px;">
+                    <div id="map"></div>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Gráficos de Tiempo -->
+            <div class="w-full xl:w-1/2 flex flex-col gap-6">
+                
+                <!-- Gráfico: Meses -->
+                <div class="border rounded-lg p-4 bg-white shadow-sm flex-1">
+                    <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Mes</h3>
+                    <div class="relative w-full h-64"><canvas id="mesChart"></canvas></div>
+                </div>
+
+                <!-- Gráfico: Tendencia -->
+                <div class="border rounded-lg p-4 bg-white shadow-sm flex-1">
+                    <h3 class="text-md font-bold text-gray-700 mb-1">Tendencia Mensual (Eventos Diarios)</h3>
+                    <div class="relative w-full h-64"><canvas id="tendenciaChart"></canvas></div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Gráfico Inferior: Por Camioneta -->
+        <div class="mt-6 border rounded-lg p-4 bg-white shadow-sm w-full">
+            <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Camioneta (Escala Logarítmica)</h3>
+            <div class="relative w-full h-80"><canvas id="camionetaChart"></canvas></div>
+        </div>
+
+    </div>
+
+    <!-- MODAL INTERACTIVO -->
+    <div id="dataModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex justify-center items-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-900 text-white">
+                <h2 id="modalTitle" class="text-xl font-bold">Detalle de Eventos</h2>
+                <button onclick="cerrarModal()" class="text-white hover:text-gray-300 font-bold text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-0 overflow-auto flex-grow bg-gray-50">
+                <table class="w-full text-sm text-left whitespace-nowrap">
+                    <thead id="modalThead" class="bg-gray-200 uppercase text-xs text-gray-700 sticky top-0 shadow-sm"></thead>
+                    <tbody id="modalTbody" class="divide-y divide-gray-200 bg-white"></tbody>
+                </table>
+            </div>
+            <div class="p-3 bg-gray-100 border-t text-right text-xs text-gray-600 font-bold" id="modalCount">
+                Total registros: 0
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Google Sheets
+        const sheetId = '1_5tFMzqyZaaa7UGavxp0qJE5JZvY0oXyttAn_MI9Ywg';
+        // Asumiendo que los datos están en la primera hoja. Cambiar "Hoja1" por el nombre real si falla.
+        const urlDatos = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+
+        let rawData = [];
+        let map = null;
+        let mapMarkers = [];
+        let charts = { mes: null, tendencia: null, camioneta: null };
+
+        // Definición de colores según rangos de Looker Studio
+        const color70 = '#10b981'; // Verde (70-75)
+        const color76 = '#fbbf24'; // Amarillo (76-80)
+        const color80 = '#ef4444'; // Rojo (>80)
+
+        // Parseador de Fechas genérico
+        function parseFecha(fechaStr) {
+            if (!fechaStr) return null;
+            let f = fechaStr.toString().trim();
+            const partes = f.split(/[-/ T]/);
+            if (partes.length >= 3) {
+                // Determinar formato (DD/MM/YYYY vs YYYY/MM/DD)
+                if (partes[0].length === 4) return { año: partes[0], mes: partes[1].padStart(2, '0'), dia: partes[2].substring(0,2).padStart(2, '0') };
+                else return { año: partes[2].substring(0,4), mes: partes[1].padStart(2, '0'), dia: partes[0].padStart(2, '0') };
+            }
+            return null;
+        }
+
+        function fetchCSV(url) {
+            return new Promise((resolve, reject) => {
+                Papa.parse(url, {
+                    download: true, header: true, skipEmptyLines: true,
+                    complete: results => resolve(results.data),
+                    error: err => reject(err)
+                });
+            });
+        }
+
+        window.onload = function() {
+            inicializarMapa();
+            
+            fetchCSV(urlDatos).then(data => {
+                rawData = data.map(d => {
+                    // Normalizar nombres de columnas (ajustar según el CSV real)
+                    return {
+                        fechaRaw: d['Fecha'] || d['Date'] || d['fecha'] || '',
+                        movil: (d['Movil'] || d['Camioneta'] || d['Equipo'] || 'Desconocido').trim(),
+                        contrato: (d['Contrato'] || 'Sin Contrato').trim(),
+                        velocidad: parseFloat(d['Velocidad'] || d['Velocidad (km/h)'] || d['Speed']) || 0,
+                        lat: parseFloat(d['Latitud'] || d['Lat'] || 0),
+                        lng: parseFloat(d['Longitud'] || d['Lng'] || d['Lon'] || 0)
+                    };
+                }).filter(d => d.velocidad >= 70); // Filtrar solo excesos según el dashboard original
+
+                document.getElementById('estadoCarga').textContent = "Datos cargados de Google Sheets ✓";
+                document.getElementById('estadoCarga').className = "text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded shadow-sm";
+                document.getElementById('filtrosContainer').classList.remove('hidden');
+                document.getElementById('filtrosContainer').classList.add('flex');
+                
+                inicializarFiltros();
+                procesarYDibujarTodo();
+            }).catch(err => {
+                document.getElementById('estadoCarga').textContent = "Error cargando datos. Revisa permisos o estructura.";
+                document.getElementById('estadoCarga').className = "text-sm font-bold text-red-600 bg-red-50 p-2 rounded shadow-sm";
+                console.error(err);
+            });
+        };
+
+        function inicializarMapa() {
+            // Inicializar mapa centrado en La Guajira (Cerrejón aprox)
+            map = L.map('map').setView([11.08, -72.63], 8);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            }).addTo(map);
+        }
+
+        function inicializarFiltros() {
+            const mesesSet = new Set(), movilSet = new Set(), contratoSet = new Set();
+            
+            rawData.forEach(d => {
+                const pFecha = parseFecha(d.fechaRaw);
+                if (pFecha) mesesSet.add(`${pFecha.año}-${pFecha.mes}`);
+                movilSet.add(d.movil);
+                contratoSet.add(d.contrato);
+            });
+
+            const poblarSelect = (id, set) => {
+                const select = document.getElementById(id);
+                Array.from(set).sort().forEach(item => select.appendChild(new Option(item, item)));
+            };
+
+            poblarSelect('mesFilter', mesesSet);
+            poblarSelect('movilFilter', movilSet);
+            poblarSelect('contratoFilter', contratoSet);
+        }
+
+        function cerrarModal() { document.getElementById('dataModal').classList.add('hidden'); }
+
+        function abrirModalDatos(titulo, datos) {
+            document.getElementById('modalTitle').textContent = titulo;
+            const columnas = ['Fecha', 'Movil', 'Contrato', 'Velocidad', 'Latitud', 'Longitud'];
+            
+            const thead = document.getElementById('modalThead');
+            thead.innerHTML = `<tr>${columnas.map(col => `<th class="px-4 py-3 font-bold text-left border-b">${col}</th>`).join('')}</tr>`;
+            
+            const tbody = document.getElementById('modalTbody');
+            tbody.innerHTML = datos.map(fila => `
+                <tr class="hover:bg-blue-50 transition-colors">
+                    <td class="px-4 py-2 border-b border-gray-100">${fila.fechaRaw}</td>
+                    <td class="px-4 py-2 border-b border-gray-100 font-bold">${fila.movil}</td>
+                    <td class="px-4 py-2 border-b border-gray-100">${fila.contrato}</td>
+                    <td class="px-4 py-2 border-b border-gray-100 ${fila.velocidad > 80 ? 'text-red-600 font-bold' : ''}">${fila.velocidad}</td>
+                    <td class="px-4 py-2 border-b border-gray-100">${fila.lat}</td>
+                    <td class="px-4 py-2 border-b border-gray-100">${fila.lng}</td>
+                </tr>
+            `).join('');
+            
+            document.getElementById('modalCount').textContent = `Total registros mostrados: ${datos.length}`;
+            document.getElementById('dataModal').classList.remove('hidden');
+        }
+
+        function procesarYDibujarTodo() {
+            const mesSel = document.getElementById('mesFilter').value;
+            const movilSel = document.getElementById('movilFilter').value;
+            const contratoSel = document.getElementById('contratoFilter').value;
+
+            // Filtrar Base de Datos
+            const datosFiltrados = rawData.filter(d => {
+                const pFecha = parseFecha(d.fechaRaw);
+                const mesKey = pFecha ? `${pFecha.año}-${pFecha.mes}` : null;
+                
+                if (mesSel !== 'Todos' && mesKey !== mesSel) return false;
+                if (movilSel !== 'Todos' && d.movil !== movilSel) return false;
+                if (contratoSel !== 'Todos' && d.contrato !== contratoSel) return false;
+                return true;
+            });
+
+            // Variables de Agrupación
+            let maxVel = 0, sumVel = 0, countVel = 0;
+            let c70 = 0, c76 = 0, c80 = 0;
+            
+            const agruparMes = {}, agruparDia = {}, agruparMovil = {};
+            
+            // Limpiar marcadores del mapa
+            mapMarkers.forEach(m => map.removeLayer(m));
+            mapMarkers = [];
+
+            datosFiltrados.forEach(d => {
+                const v = d.velocidad;
+                maxVel = Math.max(maxVel, v);
+                sumVel += v;
+                countVel++;
+
+                let bucket = '';
+                let colorMarcador = '';
+                
+                if (v >= 70 && v <= 75) { c70++; bucket = 'b70'; colorMarcador = color70; }
+                else if (v >= 76 && v <= 80) { c76++; bucket = 'b76'; colorMarcador = color76; }
+                else if (v > 80) { c80++; bucket = 'b80'; colorMarcador = color80; }
+
+                // Agrupaciones Temporales
+                const pF = parseFecha(d.fechaRaw);
+                if (pF) {
+                    const mesKey = `${pF.año}-${pF.mes}`;
+                    const diaKey = `${pF.año}-${pF.mes}-${pF.dia}`;
+                    
+                    if (!agruparMes[mesKey]) agruparMes[mesKey] = { b70:0, b76:0, b80:0 };
+                    agruparMes[mesKey][bucket]++;
+
+                    if (!agruparDia[diaKey]) agruparDia[diaKey] = 0;
+                    agruparDia[diaKey]++;
+                }
+
+                // Agrupación Camionetas
+                if (!agruparMovil[d.movil]) agruparMovil[d.movil] = { b70:0, b76:0, b80:0, total:0 };
+                agruparMovil[d.movil][bucket]++;
+                agruparMovil[d.movil].total++;
+
+                // Dibujar en Mapa
+                if (d.lat !== 0 && d.lng !== 0) {
+                    const circle = L.circleMarker([d.lat, d.lng], {
+                        radius: 5, fillColor: colorMarcador, color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8
+                    }).bindPopup(`<b>${d.movil}</b><br>Velocidad: ${v} km/h<br>Fecha: ${d.fechaRaw}`);
+                    
+                    circle.on('click', () => abrirModalDatos(`Detalle Evento: ${d.movil}`, [d]));
+                    circle.addTo(map);
+                    mapMarkers.push(circle);
+                }
+            });
+
+            // Actualizar KPIs
+            document.getElementById('kpiPromedio').textContent = countVel > 0 ? Math.round(sumVel / countVel) : 0;
+            document.getElementById('kpiMaxima').textContent = Math.round(maxVel);
+            document.getElementById('kpi70').textContent = c70.toLocaleString('es-CO');
+            document.getElementById('kpi76').textContent = c76.toLocaleString('es-CO');
+            document.getElementById('kpi80').textContent = c80.toLocaleString('es-CO');
+
+            // Preparar Datos para Gráficos
+            const labelsMes = Object.keys(agruparMes).sort();
+            const dMes70 = labelsMes.map(l => agruparMes[l].b70);
+            const dMes76 = labelsMes.map(l => agruparMes[l].b76);
+            const dMes80 = labelsMes.map(l => agruparMes[l].b80);
+
+            const labelsDia = Object.keys(agruparDia).sort();
+            const dDia = labelsDia.map(l => agruparDia[l]);
+
+            // Ordenar Móviles de mayor a menor total
+            const movilesOrdenados = Object.keys(agruparMovil).sort((a,b) => agruparMovil[b].total - agruparMovil[a].total).slice(0, 50); // Top 50 para legibilidad
+            const dMovil70 = movilesOrdenados.map(m => agruparMovil[m].b70);
+            const dMovil76 = movilesOrdenados.map(m => agruparMovil[m].b76);
+            const dMovil80 = movilesOrdenados.map(m => agruparMovil[m].b80);
+
+            dibujarGraficos(
+                labelsMes, dMes70, dMes76, dMes80,
+                labelsDia, dDia,
+                movilesOrdenados, dMovil70, dMovil76, dMovil80
+            );
+        }
+
+        function dibujarGraficos(labelsMes, dMes70, dMes76, dMes80, labelsDia, dDia, labelsMovil, dMovil70, dMovil76, dMovil80) {
+            
+            const configLeyenda = { display: true, position: 'top', labels: { boxWidth: 12 } };
+
+            // Gráfico 1: Meses (Barras Apiladas)
+            if (charts.mes) charts.mes.destroy();
+            charts.mes = new Chart(document.getElementById('mesChart'), {
+                type: 'bar',
+                data: {
+                    labels: labelsMes,
+                    datasets: [
+                        { label: '70-75', data: dMes70, backgroundColor: color70 },
+                        { label: '76-80', data: dMes76, backgroundColor: color76 },
+                        { label: '>80', data: dMes80, backgroundColor: color80 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { x: { stacked: true }, y: { stacked: true } },
+                    plugins: { legend: configLeyenda }
+                }
+            });
+
+            // Gráfico 2: Tendencia Mensual Diaria (Líneas)
+            if (charts.tendencia) charts.tendencia.destroy();
+            charts.tendencia = new Chart(document.getElementById('tendenciaChart'), {
+                type: 'line',
+                data: {
+                    labels: labelsDia,
+                    datasets: [{ label: 'Eventos Diarios', data: dDia, borderColor: '#1e40af', backgroundColor: 'rgba(30, 64, 175, 0.1)', fill: true, tension: 0.3 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { ticks: { maxTicksLimit: 10 } } }
+                }
+            });
+
+            // Gráfico 3: Camionetas (Barras Apiladas - Escala Logarítmica como en Looker)
+            if (charts.camioneta) charts.camioneta.destroy();
+            charts.camioneta = new Chart(document.getElementById('camionetaChart'), {
+                type: 'bar',
+                data: {
+                    labels: labelsMovil,
+                    datasets: [
+                        { label: '70-75', data: dMovil70, backgroundColor: color70 },
+                        { label: '76-80', data: dMovil76, backgroundColor: color76 },
+                        { label: '>80', data: dMovil80, backgroundColor: color80 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true, ticks: { autoSkip: false, maxRotation: 90, minRotation: 45, font: { size: 10 } } },
+                        y: { stacked: true, type: 'logarithmic', title: { display: true, text: 'Cantidad (Log)' } }
+                    },
+                    plugins: { legend: configLeyenda },
+                    onClick: (e, elements, chart) => {
+                        if (elements.length > 0) {
+                            const movilSelec = chart.data.labels[elements[0].index];
+                            const datosFiltrados = rawData.filter(d => d.movil === movilSelec);
+                            abrirModalDatos(`Historial Completo: ${movilSelec}`, datosFiltrados);
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
