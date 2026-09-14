@@ -27,12 +27,14 @@
         <!-- Encabezado con Logo -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
             <div class="flex items-center gap-4">
-                <div class="bg-white p-2 rounded shadow-sm border border-gray-200 flex items-center justify-center h-16 w-32">
+                <!-- Fondo negro añadido al logo -->
+                <div class="bg-black p-2 rounded shadow-sm border border-gray-800 flex items-center justify-center h-16 w-32">
                     <img src="https://www.chmmineria.com.co/fileadmin/chmmineria/img/logo.png" alt="CHM Minería" class="h-full w-full object-contain">
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800 uppercase tracking-wide">Monitoreo de Velocidad de Camionetas</h1>
-                    <h2 class="text-md text-gray-500 font-semibold mt-1">Sede Cerrejón - Tablero Interactivo</h2>
+                    <!-- Subtítulo modificado -->
+                    <h2 class="text-md text-gray-500 font-semibold mt-1">Sede Cerrejón - Monitoreo de velocidad de interaccion de equipos moviles</h2>
                 </div>
             </div>
             <div id="estadoCarga" class="text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded shadow-sm">
@@ -42,32 +44,40 @@
 
         <!-- Barra de Filtros -->
         <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
-            <div class="flex flex-col w-40">
+            <div class="flex flex-col w-36">
                 <label for="mesFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Mes (Ctrl+Click)</label>
                 <select id="mesFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-40">
+            <div class="flex flex-col w-36">
                 <label for="movilFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Móvil (Ctrl+Click)</label>
                 <select id="movilFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-56">
+            <div class="flex flex-col w-48">
                 <label for="contratoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Contrato (Ctrl+Click)</label>
                 <select id="contratoFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <!-- Nuevo Filtro: Rango de Velocidad -->
-            <div class="flex flex-col w-40">
-                <label for="rangoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Rango Vel. (Ctrl+Click)</label>
+            <div class="flex flex-col w-36">
+                <label for="rangoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Rango Vel.</label>
                 <select id="rangoFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
                     <option value="70-75">70 - 75 km/h</option>
                     <option value="76-80">76 - 80 km/h</option>
                     <option value=">80">> 80 km/h</option>
+                </select>
+            </div>
+            <!-- Nuevo Filtro: Dimensión de Tiempo para la Tendencia -->
+            <div class="flex flex-col w-40">
+                <label for="timeDimension" class="text-xs font-bold text-gray-600 uppercase mb-1">Eje Tendencia</label>
+                <select id="timeDimension" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    <option value="year">Por Año</option>
+                    <option value="year-month" selected>Por Año - Mes</option>
+                    <option value="year-week">Por Año - Semana</option>
                 </select>
             </div>
         </div>
@@ -102,7 +112,7 @@
         <div class="flex flex-col xl:flex-row gap-6">
             <div class="w-full xl:w-1/2 border rounded-lg p-2 bg-white shadow-sm flex flex-col">
                 <div class="px-2 pt-2 pb-1 flex justify-between items-center">
-                    <h3 class="text-md font-bold text-gray-700">Ubicación de Eventos de Exceso</h3>
+                    <h3 class="text-md font-bold text-gray-700">Ubicación de Eventos de Exceso (Satélite)</h3>
                     <div class="flex gap-2 text-[10px] font-bold">
                         <span class="px-2 py-1 bg-emerald-500 text-white rounded">70-75</span>
                         <span class="px-2 py-1 bg-yellow-400 text-black rounded">76-80</span>
@@ -120,7 +130,7 @@
                     <div class="relative w-full h-64"><canvas id="mesChart"></canvas></div>
                 </div>
                 <div class="border rounded-lg p-4 bg-white shadow-sm flex-1">
-                    <h3 class="text-md font-bold text-gray-700 mb-1">Tendencia Mensual (Eventos Diarios)</h3>
+                    <h3 id="tendenciaTitle" class="text-md font-bold text-gray-700 mb-1">Tendencia de Eventos</h3>
                     <div class="relative w-full h-64"><canvas id="tendenciaChart"></canvas></div>
                 </div>
             </div>
@@ -129,14 +139,12 @@
         <!-- Fila Inferior: Histograma y Camionetas -->
         <div class="mt-6 flex flex-col xl:flex-row gap-6">
             
-            <!-- Histograma -->
             <div class="w-full xl:w-1/3 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
                 <h3 class="text-md font-bold text-gray-700 mb-1">Distribución de Velocidades</h3>
                 <p class="text-[10px] text-gray-400 mb-2">Frecuencia de eventos por km/h</p>
                 <div class="relative w-full h-80"><canvas id="histogramaChart"></canvas></div>
             </div>
             
-            <!-- Gráfico Inferior -->
             <div class="w-full xl:w-2/3 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
                 <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Camioneta</h3>
                 <p class="text-[10px] text-gray-400 mb-2">Escala logarítmica para facilitar visualización</p>
@@ -226,6 +234,7 @@
                 document.getElementById('movilFilter').addEventListener('change', procesarYDibujarTodo);
                 document.getElementById('contratoFilter').addEventListener('change', procesarYDibujarTodo);
                 document.getElementById('rangoFilter').addEventListener('change', procesarYDibujarTodo);
+                document.getElementById('timeDimension').addEventListener('change', procesarYDibujarTodo);
 
                 procesarYDibujarTodo();
             }).catch(err => {
@@ -237,8 +246,10 @@
 
         function inicializarMapa() {
             map = L.map('map').setView([11.08, -72.63], 8);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
+            // Capa Híbrida Satelital de Google
+            L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                attribution: '&copy; Google Maps',
+                maxZoom: 20
             }).addTo(map);
         }
 
@@ -297,6 +308,11 @@
             const movilSel = getSeleccionados('movilFilter');
             const contratoSel = getSeleccionados('contratoFilter');
             const rangoSel = getSeleccionados('rangoFilter');
+            const dimTiempo = document.getElementById('timeDimension').value;
+
+            // Actualizar título del gráfico
+            const comboTexto = document.getElementById('timeDimension').options[document.getElementById('timeDimension').selectedIndex].text;
+            document.getElementById('tendenciaTitle').textContent = `Tendencia de Eventos (${comboTexto})`;
 
             const datosFiltrados = rawData.filter(d => {
                 const pFecha = parseFecha(d.fechaRaw);
@@ -306,7 +322,6 @@
                 if (!movilSel.esTodos && !movilSel.valores.includes(d.movil)) return false;
                 if (!contratoSel.esTodos && !contratoSel.valores.includes(d.contrato)) return false;
                 
-                // Filtro de Rango de Velocidad
                 let bucketStr = '';
                 if (d.velocidad >= 70 && d.velocidad <= 75) bucketStr = '70-75';
                 else if (d.velocidad >= 76 && d.velocidad <= 80) bucketStr = '76-80';
@@ -319,7 +334,7 @@
 
             let maxVel = 0, sumVel = 0, countVel = 0;
             let c70 = 0, c76 = 0, c80 = 0;
-            const agruparMes = {}, agruparDia = {}, agruparMovil = {}, agruparVelocidad = {};
+            const agruparMes = {}, agruparTendencia = {}, agruparMovil = {}, agruparVelocidad = {};
             
             mapMarkers.forEach(m => map.removeLayer(m));
             mapMarkers = [];
@@ -344,13 +359,24 @@
                 const pF = parseFecha(d.fechaRaw);
                 if (pF) {
                     const mesKey = `${pF.año}-${pF.mes}`;
-                    const diaKey = `${pF.año}-${pF.mes}-${pF.dia}`;
-                    
                     if (!agruparMes[mesKey]) agruparMes[mesKey] = { b70:0, b76:0, b80:0 };
                     agruparMes[mesKey][bucket]++;
 
-                    if (!agruparDia[diaKey]) agruparDia[diaKey] = 0;
-                    agruparDia[diaKey]++;
+                    // Lógica para la Dimensión de Tendencia
+                    let tendenciaKey = '';
+                    if (dimTiempo === 'year') {
+                        tendenciaKey = pF.año;
+                    } else if (dimTiempo === 'year-month') {
+                        tendenciaKey = `${pF.año}-${pF.mes}`;
+                    } else if (dimTiempo === 'year-week') {
+                        const dateObj = new Date(pF.año, parseInt(pF.mes)-1, pF.dia);
+                        const firstDayOfYear = new Date(dateObj.getFullYear(), 0, 1);
+                        const pastDaysOfYear = (dateObj - firstDayOfYear) / 86400000;
+                        const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+                        tendenciaKey = `${pF.año}-S${weekNum.toString().padStart(2, '0')}`;
+                    }
+                    if (!agruparTendencia[tendenciaKey]) agruparTendencia[tendenciaKey] = 0;
+                    agruparTendencia[tendenciaKey]++;
                 }
 
                 if (!agruparMovil[d.movil]) agruparMovil[d.movil] = { b70:0, b76:0, b80:0, total:0 };
@@ -379,8 +405,8 @@
             const dMes76 = labelsMes.map(l => agruparMes[l].b76);
             const dMes80 = labelsMes.map(l => agruparMes[l].b80);
 
-            const labelsDia = Object.keys(agruparDia).sort();
-            const dDia = labelsDia.map(l => agruparDia[l]);
+            const labelsTendencia = Object.keys(agruparTendencia).sort();
+            const dTendencia = labelsTendencia.map(l => agruparTendencia[l]);
 
             const movilesOrdenados = Object.keys(agruparMovil).sort((a,b) => agruparMovil[b].total - agruparMovil[a].total).slice(0, 50);
             const dMovil70 = movilesOrdenados.map(m => agruparMovil[m].b70);
@@ -396,7 +422,6 @@
             for (let i = minV; i <= maxV; i++) {
                 labelsHist.push(i);
                 dataHist.push(agruparVelocidad[i] || 0);
-                
                 if (i <= 75) bgHist.push(color70);
                 else if (i <= 80) bgHist.push(color76);
                 else bgHist.push(color80);
@@ -404,13 +429,13 @@
 
             dibujarGraficos(
                 labelsMes, dMes70, dMes76, dMes80,
-                labelsDia, dDia,
+                labelsTendencia, dTendencia,
                 movilesOrdenados, dMovil70, dMovil76, dMovil80,
                 labelsHist, dataHist, bgHist
             );
         }
 
-        function dibujarGraficos(labelsMes, dMes70, dMes76, dMes80, labelsDia, dDia, labelsMovil, dMovil70, dMovil76, dMovil80, labelsHist, dataHist, bgHist) {
+        function dibujarGraficos(labelsMes, dMes70, dMes76, dMes80, labelsTendencia, dTendencia, labelsMovil, dMovil70, dMovil76, dMovil80, labelsHist, dataHist, bgHist) {
             
             const configLeyenda = { display: true, position: 'top', labels: { boxWidth: 12 } };
 
@@ -436,8 +461,8 @@
             charts.tendencia = new Chart(document.getElementById('tendenciaChart'), {
                 type: 'line',
                 data: {
-                    labels: labelsDia,
-                    datasets: [{ label: 'Eventos Diarios', data: dDia, borderColor: '#1e40af', backgroundColor: 'rgba(30, 64, 175, 0.1)', fill: true, tension: 0.3 }]
+                    labels: labelsTendencia,
+                    datasets: [{ label: 'Eventos Registrados', data: dTendencia, borderColor: '#1e40af', backgroundColor: 'rgba(30, 64, 175, 0.1)', fill: true, tension: 0.3 }]
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false,
