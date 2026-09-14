@@ -24,11 +24,11 @@
 
     <div class="max-w-[1800px] mx-auto bg-white p-6 md:p-8 rounded-lg shadow-xl border-t-4 border-emerald-700">
         
-        <!-- Encabezado -->
+        <!-- Encabezado con Logo -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
             <div class="flex items-center gap-4">
-                <div class="bg-gray-900 p-2 rounded shadow-sm flex items-center justify-center">
-                    <div class="text-white font-bold px-4 py-2">CERREJÓN</div>
+                <div class="bg-white p-2 rounded shadow-sm border border-gray-200 flex items-center justify-center h-16 w-32">
+                    <img src="https://www.chmmineria.com.co/fileadmin/chmmineria/img/logo.png" alt="CHM Minería" class="h-full w-full object-contain">
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800 uppercase tracking-wide">Monitoreo de Velocidad de Camionetas</h1>
@@ -40,24 +40,34 @@
             </div>
         </div>
 
-        <!-- Barra de Filtros (Actualizada para selección múltiple) -->
+        <!-- Barra de Filtros -->
         <div id="filtrosContainer" class="hidden flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-md border border-gray-200 shadow-sm items-start">
-            <div class="flex flex-col w-48">
+            <div class="flex flex-col w-40">
                 <label for="mesFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Mes (Ctrl+Click)</label>
                 <select id="mesFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-48">
+            <div class="flex flex-col w-40">
                 <label for="movilFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Móvil (Ctrl+Click)</label>
                 <select id="movilFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
                 </select>
             </div>
-            <div class="flex flex-col w-64">
+            <div class="flex flex-col w-56">
                 <label for="contratoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Contrato (Ctrl+Click)</label>
                 <select id="contratoFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
+                </select>
+            </div>
+            <!-- Nuevo Filtro: Rango de Velocidad -->
+            <div class="flex flex-col w-40">
+                <label for="rangoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Rango Vel. (Ctrl+Click)</label>
+                <select id="rangoFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
+                    <option value="Todos" selected>Todos</option>
+                    <option value="70-75">70 - 75 km/h</option>
+                    <option value="76-80">76 - 80 km/h</option>
+                    <option value=">80">> 80 km/h</option>
                 </select>
             </div>
         </div>
@@ -116,10 +126,23 @@
             </div>
         </div>
 
-        <!-- Gráfico Inferior -->
-        <div class="mt-6 border rounded-lg p-4 bg-white shadow-sm w-full">
-            <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Camioneta (Escala Logarítmica)</h3>
-            <div class="relative w-full h-80"><canvas id="camionetaChart"></canvas></div>
+        <!-- Fila Inferior: Histograma y Camionetas -->
+        <div class="mt-6 flex flex-col xl:flex-row gap-6">
+            
+            <!-- Histograma -->
+            <div class="w-full xl:w-1/3 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
+                <h3 class="text-md font-bold text-gray-700 mb-1">Distribución de Velocidades</h3>
+                <p class="text-[10px] text-gray-400 mb-2">Frecuencia de eventos por km/h</p>
+                <div class="relative w-full h-80"><canvas id="histogramaChart"></canvas></div>
+            </div>
+            
+            <!-- Gráfico Inferior -->
+            <div class="w-full xl:w-2/3 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
+                <h3 class="text-md font-bold text-gray-700 mb-1">Conteos de Velocidad por Camioneta</h3>
+                <p class="text-[10px] text-gray-400 mb-2">Escala logarítmica para facilitar visualización</p>
+                <div class="relative w-full h-80"><canvas id="camionetaChart"></canvas></div>
+            </div>
+
         </div>
     </div>
 
@@ -149,7 +172,7 @@
         let rawData = [];
         let map = null;
         let mapMarkers = [];
-        let charts = { mes: null, tendencia: null, camioneta: null };
+        let charts = { mes: null, tendencia: null, camioneta: null, histograma: null };
 
         const color70 = '#10b981';
         const color76 = '#fbbf24';
@@ -199,10 +222,10 @@
                 
                 inicializarFiltros();
                 
-                // Configurar eventos para actualización automática
                 document.getElementById('mesFilter').addEventListener('change', procesarYDibujarTodo);
                 document.getElementById('movilFilter').addEventListener('change', procesarYDibujarTodo);
                 document.getElementById('contratoFilter').addEventListener('change', procesarYDibujarTodo);
+                document.getElementById('rangoFilter').addEventListener('change', procesarYDibujarTodo);
 
                 procesarYDibujarTodo();
             }).catch(err => {
@@ -263,7 +286,6 @@
             document.getElementById('dataModal').classList.remove('hidden');
         }
 
-        // Función auxiliar para obtener selecciones múltiples
         function getSeleccionados(id) {
             const select = document.getElementById(id);
             const options = Array.from(select.selectedOptions).map(o => o.value);
@@ -274,6 +296,7 @@
             const mesSel = getSeleccionados('mesFilter');
             const movilSel = getSeleccionados('movilFilter');
             const contratoSel = getSeleccionados('contratoFilter');
+            const rangoSel = getSeleccionados('rangoFilter');
 
             const datosFiltrados = rawData.filter(d => {
                 const pFecha = parseFecha(d.fechaRaw);
@@ -282,12 +305,21 @@
                 if (!mesSel.esTodos && !mesSel.valores.includes(mesKey)) return false;
                 if (!movilSel.esTodos && !movilSel.valores.includes(d.movil)) return false;
                 if (!contratoSel.esTodos && !contratoSel.valores.includes(d.contrato)) return false;
+                
+                // Filtro de Rango de Velocidad
+                let bucketStr = '';
+                if (d.velocidad >= 70 && d.velocidad <= 75) bucketStr = '70-75';
+                else if (d.velocidad >= 76 && d.velocidad <= 80) bucketStr = '76-80';
+                else if (d.velocidad > 80) bucketStr = '>80';
+
+                if (!rangoSel.esTodos && !rangoSel.valores.includes(bucketStr)) return false;
+
                 return true;
             });
 
             let maxVel = 0, sumVel = 0, countVel = 0;
             let c70 = 0, c76 = 0, c80 = 0;
-            const agruparMes = {}, agruparDia = {}, agruparMovil = {};
+            const agruparMes = {}, agruparDia = {}, agruparMovil = {}, agruparVelocidad = {};
             
             mapMarkers.forEach(m => map.removeLayer(m));
             mapMarkers = [];
@@ -304,6 +336,10 @@
                 if (v >= 70 && v <= 75) { c70++; bucket = 'b70'; colorMarcador = color70; }
                 else if (v >= 76 && v <= 80) { c76++; bucket = 'b76'; colorMarcador = color76; }
                 else if (v > 80) { c80++; bucket = 'b80'; colorMarcador = color80; }
+
+                const velRedondeada = Math.floor(v);
+                if (!agruparVelocidad[velRedondeada]) agruparVelocidad[velRedondeada] = 0;
+                agruparVelocidad[velRedondeada]++;
 
                 const pF = parseFecha(d.fechaRaw);
                 if (pF) {
@@ -351,14 +387,30 @@
             const dMovil76 = movilesOrdenados.map(m => agruparMovil[m].b76);
             const dMovil80 = movilesOrdenados.map(m => agruparMovil[m].b80);
 
+            const minV = 70;
+            const maxV = maxVel > 0 ? Math.ceil(maxVel) : 70;
+            const labelsHist = [];
+            const dataHist = [];
+            const bgHist = [];
+
+            for (let i = minV; i <= maxV; i++) {
+                labelsHist.push(i);
+                dataHist.push(agruparVelocidad[i] || 0);
+                
+                if (i <= 75) bgHist.push(color70);
+                else if (i <= 80) bgHist.push(color76);
+                else bgHist.push(color80);
+            }
+
             dibujarGraficos(
                 labelsMes, dMes70, dMes76, dMes80,
                 labelsDia, dDia,
-                movilesOrdenados, dMovil70, dMovil76, dMovil80
+                movilesOrdenados, dMovil70, dMovil76, dMovil80,
+                labelsHist, dataHist, bgHist
             );
         }
 
-        function dibujarGraficos(labelsMes, dMes70, dMes76, dMes80, labelsDia, dDia, labelsMovil, dMovil70, dMovil76, dMovil80) {
+        function dibujarGraficos(labelsMes, dMes70, dMes76, dMes80, labelsDia, dDia, labelsMovil, dMovil70, dMovil76, dMovil80, labelsHist, dataHist, bgHist) {
             
             const configLeyenda = { display: true, position: 'top', labels: { boxWidth: 12 } };
 
@@ -417,6 +469,35 @@
                             const movilSelec = chart.data.labels[elements[0].index];
                             const datosFiltrados = rawData.filter(d => d.movil === movilSelec);
                             abrirModalDatos(`Historial Completo: ${movilSelec}`, datosFiltrados);
+                        }
+                    }
+                }
+            });
+
+            if (charts.histograma) charts.histograma.destroy();
+            charts.histograma = new Chart(document.getElementById('histogramaChart'), {
+                type: 'bar',
+                data: {
+                    labels: labelsHist,
+                    datasets: [{
+                        label: 'Eventos',
+                        data: dataHist,
+                        backgroundColor: bgHist,
+                        borderWidth: 1,
+                        borderColor: '#e5e7eb' 
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { 
+                            title: { display: true, text: 'Velocidad (km/h)' },
+                            categoryPercentage: 1.0, 
+                            barPercentage: 1.0 
+                        },
+                        y: { 
+                            title: { display: true, text: 'Frecuencia' } 
                         }
                     }
                 }
