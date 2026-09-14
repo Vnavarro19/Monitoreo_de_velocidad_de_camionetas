@@ -27,13 +27,11 @@
         <!-- Encabezado con Logo -->
         <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b gap-4">
             <div class="flex items-center gap-4">
-                <!-- Fondo negro añadido al logo -->
                 <div class="bg-black p-2 rounded shadow-sm border border-gray-800 flex items-center justify-center h-16 w-32">
                     <img src="https://www.chmmineria.com.co/fileadmin/chmmineria/img/logo.png" alt="CHM Minería" class="h-full w-full object-contain">
                 </div>
                 <div>
                     <h1 class="text-2xl font-bold text-gray-800 uppercase tracking-wide">Monitoreo de Velocidad de Camionetas</h1>
-                    <!-- Subtítulo modificado -->
                     <h2 class="text-md text-gray-500 font-semibold mt-1">Sede Cerrejón - Monitoreo de velocidad de interaccion de equipos moviles</h2>
                 </div>
             </div>
@@ -66,12 +64,12 @@
                 <label for="rangoFilter" class="text-xs font-bold text-gray-600 uppercase mb-1">Rango Vel.</label>
                 <select id="rangoFilter" multiple size="4" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 overflow-y-auto cursor-pointer">
                     <option value="Todos" selected>Todos</option>
+                    <option value="<70">&lt; 70 km/h</option>
                     <option value="70-75">70 - 75 km/h</option>
                     <option value="76-80">76 - 80 km/h</option>
                     <option value=">80">> 80 km/h</option>
                 </select>
             </div>
-            <!-- Nuevo Filtro: Dimensión de Tiempo para la Tendencia -->
             <div class="flex flex-col w-40">
                 <label for="timeDimension" class="text-xs font-bold text-gray-600 uppercase mb-1">Eje Tendencia</label>
                 <select id="timeDimension" class="border border-gray-300 rounded p-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
@@ -82,9 +80,9 @@
             </div>
         </div>
 
-        <!-- KPIs Superiores -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div class="bg-white border rounded-lg p-4 shadow-sm text-center kpi-card border-l-4 border-l-blue-500">
+        <!-- KPIs Superiores (Ajustado a 6 columnas) -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <div class="bg-white border rounded-lg p-4 shadow-sm text-center kpi-card border-l-4 border-l-gray-500">
                 <h3 class="text-xs font-bold text-gray-500 uppercase">Vel. Promedio</h3>
                 <p id="kpiPromedio" class="text-3xl font-black text-gray-800 mt-2">0</p>
                 <p class="text-[10px] text-gray-400">km/h</p>
@@ -93,6 +91,10 @@
                 <h3 class="text-xs font-bold text-gray-500 uppercase">Vel. Máxima</h3>
                 <p id="kpiMaxima" class="text-3xl font-black text-gray-800 mt-2">0</p>
                 <p class="text-[10px] text-gray-400">km/h</p>
+            </div>
+            <div class="bg-blue-50 border border-blue-100 rounded-lg p-4 shadow-sm text-center kpi-card">
+                <h3 class="text-xs font-bold text-blue-700 uppercase">Eventos &lt; 70 km/h</h3>
+                <p id="kpiMenor70" class="text-3xl font-black text-blue-600 mt-2">0</p>
             </div>
             <div class="bg-emerald-50 border border-emerald-100 rounded-lg p-4 shadow-sm text-center kpi-card">
                 <h3 class="text-xs font-bold text-emerald-700 uppercase">Eventos 70-75 km/h</h3>
@@ -112,8 +114,9 @@
         <div class="flex flex-col xl:flex-row gap-6">
             <div class="w-full xl:w-1/2 border rounded-lg p-2 bg-white shadow-sm flex flex-col">
                 <div class="px-2 pt-2 pb-1 flex justify-between items-center">
-                    <h3 class="text-md font-bold text-gray-700">Ubicación de Eventos de Exceso (Satélite)</h3>
+                    <h3 class="text-md font-bold text-gray-700">Ubicación de Eventos (Satélite)</h3>
                     <div class="flex gap-2 text-[10px] font-bold">
+                        <span class="px-2 py-1 bg-blue-500 text-white rounded">&lt;70</span>
                         <span class="px-2 py-1 bg-emerald-500 text-white rounded">70-75</span>
                         <span class="px-2 py-1 bg-yellow-400 text-black rounded">76-80</span>
                         <span class="px-2 py-1 bg-red-500 text-white rounded">>80</span>
@@ -138,7 +141,6 @@
 
         <!-- Fila Inferior: Histograma y Camionetas -->
         <div class="mt-6 flex flex-col xl:flex-row gap-6">
-            
             <div class="w-full xl:w-1/3 border rounded-lg p-4 bg-white shadow-sm flex flex-col">
                 <h3 class="text-md font-bold text-gray-700 mb-1">Distribución de Velocidades</h3>
                 <p class="text-[10px] text-gray-400 mb-2">Frecuencia de eventos por km/h</p>
@@ -150,7 +152,6 @@
                 <p class="text-[10px] text-gray-400 mb-2">Escala logarítmica para facilitar visualización</p>
                 <div class="relative w-full h-80"><canvas id="camionetaChart"></canvas></div>
             </div>
-
         </div>
     </div>
 
@@ -182,9 +183,11 @@
         let mapMarkers = [];
         let charts = { mes: null, tendencia: null, camioneta: null, histograma: null };
 
-        const color70 = '#10b981';
-        const color76 = '#fbbf24';
-        const color80 = '#ef4444';
+        // Definición de colores
+        const colorMenor70 = '#3b82f6'; // Azul
+        const color70 = '#10b981'; // Verde
+        const color76 = '#fbbf24'; // Amarillo
+        const color80 = '#ef4444'; // Rojo
 
         function parseFecha(fechaStr) {
             if (!fechaStr) return null;
@@ -221,7 +224,7 @@
                         lng: parseFloat(d['Longitud']) || 0,
                         localizacion: d['Localizacion'] || ''
                     };
-                }).filter(d => d.velocidad >= 70); 
+                }).filter(d => !isNaN(d.velocidad)); 
 
                 document.getElementById('estadoCarga').textContent = "Datos cargados de Google Sheets ✓";
                 document.getElementById('estadoCarga').className = "text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded shadow-sm";
@@ -246,7 +249,6 @@
 
         function inicializarMapa() {
             map = L.map('map').setView([11.08, -72.63], 8);
-            // Capa Híbrida Satelital de Google
             L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
                 attribution: '&copy; Google Maps',
                 maxZoom: 20
@@ -310,7 +312,6 @@
             const rangoSel = getSeleccionados('rangoFilter');
             const dimTiempo = document.getElementById('timeDimension').value;
 
-            // Actualizar título del gráfico
             const comboTexto = document.getElementById('timeDimension').options[document.getElementById('timeDimension').selectedIndex].text;
             document.getElementById('tendenciaTitle').textContent = `Tendencia de Eventos (${comboTexto})`;
 
@@ -323,7 +324,8 @@
                 if (!contratoSel.esTodos && !contratoSel.valores.includes(d.contrato)) return false;
                 
                 let bucketStr = '';
-                if (d.velocidad >= 70 && d.velocidad <= 75) bucketStr = '70-75';
+                if (d.velocidad < 70) bucketStr = '<70';
+                else if (d.velocidad >= 70 && d.velocidad <= 75) bucketStr = '70-75';
                 else if (d.velocidad >= 76 && d.velocidad <= 80) bucketStr = '76-80';
                 else if (d.velocidad > 80) bucketStr = '>80';
 
@@ -332,8 +334,8 @@
                 return true;
             });
 
-            let maxVel = 0, sumVel = 0, countVel = 0;
-            let c70 = 0, c76 = 0, c80 = 0;
+            let minVel = Infinity, maxVel = 0, sumVel = 0, countVel = 0;
+            let cMenor70 = 0, c70 = 0, c76 = 0, c80 = 0;
             const agruparMes = {}, agruparTendencia = {}, agruparMovil = {}, agruparVelocidad = {};
             
             mapMarkers.forEach(m => map.removeLayer(m));
@@ -341,6 +343,7 @@
 
             datosFiltrados.forEach(d => {
                 const v = d.velocidad;
+                minVel = Math.min(minVel, v);
                 maxVel = Math.max(maxVel, v);
                 sumVel += v;
                 countVel++;
@@ -348,7 +351,8 @@
                 let bucket = '';
                 let colorMarcador = '';
                 
-                if (v >= 70 && v <= 75) { c70++; bucket = 'b70'; colorMarcador = color70; }
+                if (v < 70) { cMenor70++; bucket = 'bMenor70'; colorMarcador = colorMenor70; }
+                else if (v >= 70 && v <= 75) { c70++; bucket = 'b70'; colorMarcador = color70; }
                 else if (v >= 76 && v <= 80) { c76++; bucket = 'b76'; colorMarcador = color76; }
                 else if (v > 80) { c80++; bucket = 'b80'; colorMarcador = color80; }
 
@@ -359,10 +363,9 @@
                 const pF = parseFecha(d.fechaRaw);
                 if (pF) {
                     const mesKey = `${pF.año}-${pF.mes}`;
-                    if (!agruparMes[mesKey]) agruparMes[mesKey] = { b70:0, b76:0, b80:0 };
+                    if (!agruparMes[mesKey]) agruparMes[mesKey] = { bMenor70:0, b70:0, b76:0, b80:0 };
                     agruparMes[mesKey][bucket]++;
 
-                    // Lógica para la Dimensión de Tendencia
                     let tendenciaKey = '';
                     if (dimTiempo === 'year') {
                         tendenciaKey = pF.año;
@@ -379,7 +382,7 @@
                     agruparTendencia[tendenciaKey]++;
                 }
 
-                if (!agruparMovil[d.movil]) agruparMovil[d.movil] = { b70:0, b76:0, b80:0, total:0 };
+                if (!agruparMovil[d.movil]) agruparMovil[d.movil] = { bMenor70:0, b70:0, b76:0, b80:0, total:0 };
                 agruparMovil[d.movil][bucket]++;
                 agruparMovil[d.movil].total++;
 
@@ -396,11 +399,13 @@
 
             document.getElementById('kpiPromedio').textContent = countVel > 0 ? Math.round(sumVel / countVel) : 0;
             document.getElementById('kpiMaxima').textContent = Math.round(maxVel);
+            document.getElementById('kpiMenor70').textContent = cMenor70.toLocaleString('es-CO');
             document.getElementById('kpi70').textContent = c70.toLocaleString('es-CO');
             document.getElementById('kpi76').textContent = c76.toLocaleString('es-CO');
             document.getElementById('kpi80').textContent = c80.toLocaleString('es-CO');
 
             const labelsMes = Object.keys(agruparMes).sort();
+            const dMesMenor70 = labelsMes.map(l => agruparMes[l].bMenor70);
             const dMes70 = labelsMes.map(l => agruparMes[l].b70);
             const dMes76 = labelsMes.map(l => agruparMes[l].b76);
             const dMes80 = labelsMes.map(l => agruparMes[l].b80);
@@ -409,12 +414,13 @@
             const dTendencia = labelsTendencia.map(l => agruparTendencia[l]);
 
             const movilesOrdenados = Object.keys(agruparMovil).sort((a,b) => agruparMovil[b].total - agruparMovil[a].total).slice(0, 50);
+            const dMovilMenor70 = movilesOrdenados.map(m => agruparMovil[m].bMenor70);
             const dMovil70 = movilesOrdenados.map(m => agruparMovil[m].b70);
             const dMovil76 = movilesOrdenados.map(m => agruparMovil[m].b76);
             const dMovil80 = movilesOrdenados.map(m => agruparMovil[m].b80);
 
-            const minV = 70;
-            const maxV = maxVel > 0 ? Math.ceil(maxVel) : 70;
+            const minV = minVel === Infinity ? 0 : Math.floor(minVel);
+            const maxV = maxVel > 0 ? Math.ceil(maxVel) : 0;
             const labelsHist = [];
             const dataHist = [];
             const bgHist = [];
@@ -422,20 +428,22 @@
             for (let i = minV; i <= maxV; i++) {
                 labelsHist.push(i);
                 dataHist.push(agruparVelocidad[i] || 0);
-                if (i <= 75) bgHist.push(color70);
+                
+                if (i < 70) bgHist.push(colorMenor70);
+                else if (i <= 75) bgHist.push(color70);
                 else if (i <= 80) bgHist.push(color76);
                 else bgHist.push(color80);
             }
 
             dibujarGraficos(
-                labelsMes, dMes70, dMes76, dMes80,
+                labelsMes, dMesMenor70, dMes70, dMes76, dMes80,
                 labelsTendencia, dTendencia,
-                movilesOrdenados, dMovil70, dMovil76, dMovil80,
+                movilesOrdenados, dMovilMenor70, dMovil70, dMovil76, dMovil80,
                 labelsHist, dataHist, bgHist
             );
         }
 
-        function dibujarGraficos(labelsMes, dMes70, dMes76, dMes80, labelsTendencia, dTendencia, labelsMovil, dMovil70, dMovil76, dMovil80, labelsHist, dataHist, bgHist) {
+        function dibujarGraficos(labelsMes, dMesMenor70, dMes70, dMes76, dMes80, labelsTendencia, dTendencia, labelsMovil, dMovilMenor70, dMovil70, dMovil76, dMovil80, labelsHist, dataHist, bgHist) {
             
             const configLeyenda = { display: true, position: 'top', labels: { boxWidth: 12 } };
 
@@ -445,6 +453,7 @@
                 data: {
                     labels: labelsMes,
                     datasets: [
+                        { label: '<70', data: dMesMenor70, backgroundColor: colorMenor70 },
                         { label: '70-75', data: dMes70, backgroundColor: color70 },
                         { label: '76-80', data: dMes76, backgroundColor: color76 },
                         { label: '>80', data: dMes80, backgroundColor: color80 }
@@ -477,6 +486,7 @@
                 data: {
                     labels: labelsMovil,
                     datasets: [
+                        { label: '<70', data: dMovilMenor70, backgroundColor: colorMenor70 },
                         { label: '70-75', data: dMovil70, backgroundColor: color70 },
                         { label: '76-80', data: dMovil76, backgroundColor: color76 },
                         { label: '>80', data: dMovil80, backgroundColor: color80 }
